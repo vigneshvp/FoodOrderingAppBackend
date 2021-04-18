@@ -42,6 +42,15 @@ public class CustomerEntityDao {
         }
     }
 
+    public CustomerEntity getCustomerByContactNumber(final String contactNumber) {
+        try {
+            return entityManager.createNamedQuery("customerByContactNumber", CustomerEntity.class)
+                    .setParameter("contactNumber", contactNumber).getSingleResult();
+        } catch (NoResultException nre) {
+            return null;
+        }
+    }
+
 
     public CustomerAuthEntity createAuthToken(final CustomerAuthEntity CustomerAuthEntity) {
         entityManager.persist(CustomerAuthEntity);
