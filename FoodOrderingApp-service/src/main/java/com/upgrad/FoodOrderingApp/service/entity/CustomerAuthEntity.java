@@ -9,6 +9,9 @@ import java.util.Objects;
 
 @Entity
 @Table(name = "customer_auth")
+@NamedQueries({
+        @NamedQuery(name = "customerAuthByAccessToken", query = "select ct from CustomerAuthEntity ct where ct.accessToken = :accessToken ")
+})
 public class CustomerAuthEntity implements Serializable {
     @Override
     public boolean equals(Object o) {

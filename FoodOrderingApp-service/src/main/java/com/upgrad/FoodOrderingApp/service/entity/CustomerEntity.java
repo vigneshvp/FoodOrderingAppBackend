@@ -9,6 +9,12 @@ import java.util.Objects;
 
 @Entity
 @Table(name = "CUSTOMER")
+@NamedQueries(
+        {
+                @NamedQuery(name = "customerByUuid", query = "select c from CustomerEntity c where c.uuid = :uuid"),
+                @NamedQuery(name = "customerByEmail", query = "select c from CustomerEntity c where c.email =:email"),
+        }
+)
 public class CustomerEntity implements Serializable {
 
     @Id
