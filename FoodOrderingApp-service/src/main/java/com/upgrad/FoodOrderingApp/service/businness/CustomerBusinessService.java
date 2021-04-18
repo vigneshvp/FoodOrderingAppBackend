@@ -2,13 +2,20 @@ package com.upgrad.FoodOrderingApp.service.businness;
 
 import com.upgrad.FoodOrderingApp.service.dao.CustomerAuthEntityDao;
 import com.upgrad.FoodOrderingApp.service.dao.CustomerEntityDao;
+import com.upgrad.FoodOrderingApp.service.entity.CustomerAuthEntity;
 import com.upgrad.FoodOrderingApp.service.entity.CustomerEntity;
+import com.upgrad.FoodOrderingApp.service.exception.AuthenticationFailedException;
 import com.upgrad.FoodOrderingApp.service.exception.SignUpRestrictedException;
 import org.apache.commons.lang3.StringUtils;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Propagation;
+
+import java.util.Base64;
+import java.util.UUID;
 
 import javax.transaction.Transactional;
+import java.time.ZonedDateTime;
 import java.util.Objects;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
@@ -59,6 +66,47 @@ public class CustomerBusinessService {
         customerEntity.setSalt(encryptedText[0]);
         customerEntity.setPassword(encryptedText[1]);
         return customerEntityDao.createCustomer(customerEntity);
+
+    }
+
+    @Transactional
+    public CustomerAuthEntity login(final String authorization)
+            throws AuthenticationFailedException {
+        String base64EncodedCredentials = authorization.split("Basic ")[1];
+        if(base64EncodedCredentials == null || StringUtils.isEmpty(base64EncodedCredentials)) {
+            throw new AuthenticationFailedException("ATH-003", "Incorrect format of decoded customer name and password");
+        }
+        byte[] decode = Base64.getDecoder().decode(base64EncodedCredentials);
+        String decodedText = new String(decode);
+        String[] decodedArray = decodedText.split(":");
+        String contactNumber = decodedArray[0];
+        String password = decodedArray[1];
+        if(password == null || StringUtils.isEmpty(password) || contactNumber == null || StringUtils.isEmpty(contactNumber)) {
+            throw new AuthenticationFailedException("ATH-003", "Incorrect format of decoded customer name and password");
+        }
+        CustomerEntity customerEntity = customerEntityDao.getCustomerByContactNumber(contactNumber);
+        if (customerEntity == null) {
+            throw new AuthenticationFailedException("ATH-001", "This contact number has not been registered!");
+        }
+
+        final String encryptedPassword = PasswordCryptographyProvider
+                .encrypt(password, customerEntity.getSalt());
+        if (encryptedPassword.equals(customerEntity.getPassword())) {
+            JwtTokenProvider jwtTokenProvider = new JwtTokenProvider(encryptedPassword);
+            CustomerAuthEntity customerAuthToken = new CustomerAuthEntity();
+            customerAuthToken.setCustomer(customerEntity);
+            final ZonedDateTime now = ZonedDateTime.now();
+            final ZonedDateTime expiresAt = now.plusHours(8);
+            customerAuthToken.setAccessToken(
+                    jwtTokenProvider.generateToken(customerEntity.getUuid(), now, expiresAt));
+            customerAuthToken.setLoginAt(now);
+            customerAuthToken.setExpiresAt(expiresAt);
+            customerAuthToken.setUuid(UUID.randomUUID().toString());
+            customerEntityDao.createAuthToken(customerAuthToken);
+            return customerAuthToken;
+        } else {
+            throw new AuthenticationFailedException("ATH-002", "Invalid Credentials");
+        }
 
     }
 
