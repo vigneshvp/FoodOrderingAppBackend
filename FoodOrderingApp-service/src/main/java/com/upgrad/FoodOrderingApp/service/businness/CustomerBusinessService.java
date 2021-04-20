@@ -5,6 +5,7 @@ import com.upgrad.FoodOrderingApp.service.dao.CustomerEntityDao;
 import com.upgrad.FoodOrderingApp.service.entity.CustomerAuthEntity;
 import com.upgrad.FoodOrderingApp.service.entity.CustomerEntity;
 import com.upgrad.FoodOrderingApp.service.exception.AuthenticationFailedException;
+import com.upgrad.FoodOrderingApp.service.exception.AuthorizationFailedException;
 import com.upgrad.FoodOrderingApp.service.exception.SignUpRestrictedException;
 import org.apache.commons.lang3.StringUtils;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -109,6 +110,22 @@ public class CustomerBusinessService {
         }
 
     }
+
+
+
+    @Transactional
+    public CustomerAuthEntity logout(final String accessToken) throws AuthorizationFailedException {
+        CustomerAuthEntity customerAuthEntity = customerEntityDao.getCustomerAuthToken(accessToken);
+        if (customerAuthEntity == null) {
+            throw new AuthorizationFailedException("ATHR-001", "Customer is not Logged in");
+        }
+        final ZonedDateTime now = ZonedDateTime.now();
+        customerAuthEntity.setLogoutAt(now);
+        customerEntityDao.updateCustomerAuthEntity(customerAuthEntity);
+        return customerAuthEntity;
+    }
+
+
 
     /**
      * Validates a customer entity object
