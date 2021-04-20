@@ -71,7 +71,7 @@ public class CustomerController {
     }
 
     @RequestMapping(method = RequestMethod.POST, path = "/logout", produces = MediaType.APPLICATION_JSON_UTF8_VALUE)
-    public ResponseEntity<LogoutResponse> signout(
+    public ResponseEntity<LogoutResponse> logout(
             @RequestHeader("authorization") final String authorization)
             throws AuthorizationFailedException {
         CustomerAuthEntity customerAuthToken = customerBusinessService.logout(authorization);
