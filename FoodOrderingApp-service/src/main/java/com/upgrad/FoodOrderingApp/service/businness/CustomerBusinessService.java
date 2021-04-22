@@ -121,6 +121,12 @@ public class CustomerBusinessService {
             throw new AuthorizationFailedException("ATHR-001", "Customer is not Logged in");
         }
         final ZonedDateTime now = ZonedDateTime.now();
+        if(customerAuthEntity.getLogoutAt() != null) {
+            throw new AuthorizationFailedException("ATHR-002", "Customer is logged out. Log in again to access this endpoint.");
+        }
+        if(customerAuthEntity.getExpiresAt().compareTo(now) <= 0) {
+            throw new AuthorizationFailedException("ATHR-003", "Your session is expired. Log in again to access this endpoint.");
+        }
         customerAuthEntity.setLogoutAt(now);
         customerEntityDao.updateCustomerAuthEntity(customerAuthEntity);
         return customerAuthEntity;
