@@ -24,7 +24,7 @@ public enum GenericErrorCode implements ErrorCode {
 
     private final String defaultMessage;
 
-    private GenericErrorCode(final String code, final String defaultMessage) {
+    GenericErrorCode(final String code, final String defaultMessage) {
         this.code = code;
         this.defaultMessage = defaultMessage;
     }
