@@ -11,14 +11,12 @@ import com.upgrad.FoodOrderingApp.service.exception.UpdateCustomerException;
 import org.apache.commons.lang3.StringUtils;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
-import org.springframework.transaction.annotation.Propagation;
-
-import java.util.Base64;
-import java.util.UUID;
 
 import javax.transaction.Transactional;
 import java.time.ZonedDateTime;
+import java.util.Base64;
 import java.util.Objects;
+import java.util.UUID;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
@@ -38,6 +36,13 @@ public class CustomerBusinessService {
         this.passwordCryptographyProvider = passwordCryptographyProvider;
     }
 
+    /**
+     * Creates a customer
+     *
+     * @param customerEntity
+     * @return the created customer
+     * @throws SignUpRestrictedException
+     */
     @Transactional
     public CustomerEntity createCustomer(final CustomerEntity customerEntity) throws SignUpRestrictedException {
         String password = customerEntity.getPassword();
@@ -63,7 +68,7 @@ public class CustomerBusinessService {
             throw new SignUpRestrictedException("SGR-004",
                     "Weak password!");
         }
-
+        //Encrypt the password
         String[] encryptedText = passwordCryptographyProvider.encrypt(customerEntity.getPassword());
         customerEntity.setSalt(encryptedText[0]);
         customerEntity.setPassword(encryptedText[1]);
@@ -71,11 +76,18 @@ public class CustomerBusinessService {
 
     }
 
+    /**
+     * Login for a customer
+     *
+     * @param authorization
+     * @return CustomerAuthEntity with login details
+     * @throws AuthenticationFailedException
+     */
     @Transactional
     public CustomerAuthEntity login(final String authorization)
             throws AuthenticationFailedException {
         String base64EncodedCredentials = authorization.split("Basic ")[1];
-        if(base64EncodedCredentials == null || StringUtils.isEmpty(base64EncodedCredentials)) {
+        if (base64EncodedCredentials == null || StringUtils.isEmpty(base64EncodedCredentials)) {
             throw new AuthenticationFailedException("ATH-003", "Incorrect format of decoded customer name and password");
         }
         byte[] decode = Base64.getDecoder().decode(base64EncodedCredentials);
@@ -83,7 +95,7 @@ public class CustomerBusinessService {
         String[] decodedArray = decodedText.split(":");
         String contactNumber = decodedArray[0];
         String password = decodedArray[1];
-        if(password == null || StringUtils.isEmpty(password) || contactNumber == null || StringUtils.isEmpty(contactNumber)) {
+        if (password == null || StringUtils.isEmpty(password) || contactNumber == null || StringUtils.isEmpty(contactNumber)) {
             throw new AuthenticationFailedException("ATH-003", "Incorrect format of decoded customer name and password");
         }
         CustomerEntity customerEntity = customerEntityDao.getCustomerByContactNumber(contactNumber);
@@ -113,7 +125,13 @@ public class CustomerBusinessService {
     }
 
 
-
+    /**
+     * Logout a customer
+     *
+     * @param accessToken
+     * @return The CustomerAuthEntity
+     * @throws AuthorizationFailedException
+     */
     @Transactional
     public CustomerAuthEntity logout(final String accessToken) throws AuthorizationFailedException {
         CustomerAuthEntity customerAuthEntity = customerEntityDao.getCustomerAuthToken(accessToken);
@@ -121,10 +139,10 @@ public class CustomerBusinessService {
             throw new AuthorizationFailedException("ATHR-001", "Customer is not Logged in");
         }
         final ZonedDateTime now = ZonedDateTime.now();
-        if(customerAuthEntity.getLogoutAt() != null) {
+        if (customerAuthEntity.getLogoutAt() != null) {
             throw new AuthorizationFailedException("ATHR-002", "Customer is logged out. Log in again to access this endpoint.");
         }
-        if(customerAuthEntity.getExpiresAt().compareTo(now) <= 0) {
+        if (customerAuthEntity.getExpiresAt().compareTo(now) <= 0) {
             throw new AuthorizationFailedException("ATHR-003", "Your session is expired. Log in again to access this endpoint.");
         }
         customerAuthEntity.setLogoutAt(now);
@@ -133,20 +151,29 @@ public class CustomerBusinessService {
     }
 
 
+    /**
+     * This method updates the details of a customer
+     *
+     * @param accessToken
+     * @param customerEntity
+     * @return the updated customer entity
+     * @throws AuthorizationFailedException
+     * @throws UpdateCustomerException
+     */
     @Transactional
-    public CustomerEntity update(final String accessToken,final CustomerEntity customerEntity) throws AuthorizationFailedException, UpdateCustomerException {
+    public CustomerEntity update(final String accessToken, final CustomerEntity customerEntity) throws AuthorizationFailedException, UpdateCustomerException {
         CustomerAuthEntity customerAuthEntity = customerEntityDao.getCustomerAuthToken(accessToken);
         if (customerAuthEntity == null) {
             throw new AuthorizationFailedException("ATHR-001", "Customer is not Logged in");
         }
         final ZonedDateTime now = ZonedDateTime.now();
-        if(customerAuthEntity.getLogoutAt() != null) {
+        if (customerAuthEntity.getLogoutAt() != null) {
             throw new AuthorizationFailedException("ATHR-002", "Customer is logged out. Log in again to access this endpoint.");
         }
-        if(customerAuthEntity.getExpiresAt().compareTo(now) <= 0) {
+        if (customerAuthEntity.getExpiresAt().compareTo(now) <= 0) {
             throw new AuthorizationFailedException("ATHR-003", "Your session is expired. Log in again to access this endpoint.");
         }
-        if(customerEntity.getFirstName() == null || StringUtils.isEmpty(customerEntity.getFirstName())) {
+        if (customerEntity.getFirstName() == null || StringUtils.isEmpty(customerEntity.getFirstName())) {
             throw new UpdateCustomerException("UCR-002", "First name field should not be empty");
         }
         CustomerEntity updatedCustomerEntity = customerAuthEntity.getCustomer();
@@ -156,6 +183,48 @@ public class CustomerBusinessService {
         return updatedCustomerEntity;
     }
 
+    /**
+     * This method updates a password for a customer
+     *
+     * @param accessToken
+     * @param oldPassword
+     * @param newPassword
+     * @return the updated customer entity with new password
+     * @throws AuthorizationFailedException
+     * @throws UpdateCustomerException
+     * @throws SignUpRestrictedException
+     */
+    @Transactional
+    public CustomerEntity updatePassword(final String accessToken, final String oldPassword, final String newPassword) throws AuthorizationFailedException, UpdateCustomerException, SignUpRestrictedException {
+        if (oldPassword == null || StringUtils.isEmpty(oldPassword) || newPassword == null || StringUtils.isEmpty(newPassword)) {
+            throw new UpdateCustomerException("UCR-003", "No field should be empty");
+        }
+        CustomerAuthEntity customerAuthEntity = customerEntityDao.getCustomerAuthToken(accessToken);
+        if (customerAuthEntity == null) {
+            throw new AuthorizationFailedException("ATHR-001", "Customer is not Logged in");
+        }
+        final ZonedDateTime now = ZonedDateTime.now();
+        if (customerAuthEntity.getLogoutAt() != null) {
+            throw new AuthorizationFailedException("ATHR-002", "Customer is logged out. Log in again to access this endpoint.");
+        }
+        if (customerAuthEntity.getExpiresAt().compareTo(now) <= 0) {
+            throw new AuthorizationFailedException("ATHR-003", "Your session is expired. Log in again to access this endpoint.");
+        }
+        CustomerEntity customerEntity = customerAuthEntity.getCustomer();
+        String[] encryptedText = passwordCryptographyProvider.encrypt(oldPassword);
+        // If encrypted password stored in database and encrypted password from request do not match , throw exception
+        if (!StringUtils.equals(encryptedText[1], oldPassword)) {
+            throw new UpdateCustomerException("UCR-004", "Incorrect old password");
+        }
+        if (!validatePassword(newPassword)) {
+            throw new UpdateCustomerException("UCR-001", "Weak password!");
+        }
+        String[] encryptedTextForNewPassword = passwordCryptographyProvider.encrypt(newPassword);
+        customerEntity.setPassword(encryptedTextForNewPassword[1]);
+        customerEntity.setSalt(encryptedTextForNewPassword[0]);
+        customerEntityDao.updateCustomer(customerEntity);
+        return customerEntity;
+    }
 
 
     /**
